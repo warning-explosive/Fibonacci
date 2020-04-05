@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Update="Calculation\FibonacciConcurrentStorage.cs">
+      <DependentUpon>IFibonacciStorage.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Calculation\FibonacciUnsafeCalculator.cs">
+      <DependentUpon>IFibonacciCalculator.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Calculation\FibonacciSafeCalculator.cs">
+      <DependentUpon>IFibonacciCalculator.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Steps\CalculationPipelineStep.cs">
+      <DependentUpon>CalculationPipelineStepDecorator.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Steps\StoreCalculationPipelineStep.cs">
+      <DependentUpon>StoreCalculationPipelineStepDecorator.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Steps\ReplyPipelineStep.cs">
+      <DependentUpon>ReplyPipelineStepDecorator.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EventBusApi\EventBusApi.csproj" />
+    <ProjectReference Include="..\TransportApi\TransportApi.csproj" />
+  </ItemGroup>
+
+</Project>
