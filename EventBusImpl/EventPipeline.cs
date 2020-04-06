@@ -13,23 +13,30 @@ namespace EventBusImpl
     {
         private bool _isLocked;
 
-        private volatile bool _isRunning;
+        private bool _isRunning;
         
-        private readonly IDictionary<Type, Queue<Action<IDomainEvent>>> _pipelines = new Dictionary<Type, Queue<Action<IDomainEvent>>>();
+        private readonly IDictionary<Type, Queue<Action<IDomainEvent>>> _pipelines;
         
         private readonly IEventBus _eventBus;
 
-        private readonly CancellationTokenSource _cts;
-
         private readonly int _concurrencyLevel;
 
-        public EventPipeline(IEventBus eventBus, int concurrencyLevel)
+        private readonly List<Task> _concurrencyList;
+
+        private readonly CancellationTokenSource _cts;
+
+        private readonly int _retryLimit;
+
+        public EventPipeline(IEventBus eventBus, int concurrencyLevel, int retryLimit)
         {
             _isLocked = false;
             _isRunning = false;
+            _pipelines = new Dictionary<Type, Queue<Action<IDomainEvent>>>();
             _eventBus = eventBus;
-            _cts = new CancellationTokenSource();
             _concurrencyLevel = concurrencyLevel;
+            _concurrencyList = new List<Task>(_concurrencyLevel);
+            _cts = new CancellationTokenSource();
+            _retryLimit = retryLimit;
         }
 
         public void RegisterStep<TDomainEvent>(IPipelineStep<TDomainEvent> step)
@@ -60,8 +67,18 @@ namespace EventBusImpl
         public void StopAndRelease()
         {
             _isRunning = false;
-            
             _cts.Cancel();
+            try
+            {
+                Task.WhenAll(_concurrencyList).Wait(); // TODO: block
+            }
+            catch (AggregateException ex)
+            {
+                if (!ex.InnerExceptions.OfType<TaskCanceledException>().Any())
+                {
+                    throw;
+                }
+            }
         }
 
         public void LockAndRunEventLoop()
@@ -84,30 +101,20 @@ namespace EventBusImpl
 
         private void RunEventLoopInternal()
         {
-            var concurrencyList = new List<Task>();
-            
             while (_isRunning)
             {
-                while (concurrencyList.Count < _concurrencyLevel)
+                // throttling
+                while (_concurrencyList.Count < _concurrencyLevel
+                       && _eventBus.TryDequeue(out var domainEvent))
                 {
-                    concurrencyList.Add(GetTask());
+                    _concurrencyList.Add(InvokePipelineAsync(domainEvent, _cts.Token));
                 }
                 
-                if (concurrencyList.Any())
+                if (_concurrencyList.Any())
                 {
-                    var anyTask = Task.WhenAny(concurrencyList).Result; // TODO: block
-                    concurrencyList.Remove(anyTask);
+                    var anyTask = Task.WhenAny(_concurrencyList).Result; // TODO: block
+                    _concurrencyList.Remove(anyTask);
                 }
-            }
-            
-            Task GetTask()
-            {
-                if (_eventBus.TryDequeue(out var domainEvent))
-                {
-                    return InvokePipelineAsync(domainEvent, _cts.Token);
-                }
-
-                return Task.CompletedTask;
             }
         }
 
@@ -118,18 +125,22 @@ namespace EventBusImpl
                 throw new PipelineIsLockedException();
             }
 
-            if (domainEvent is RetryWrap wrap)
+            if (!(domainEvent is RetryWrap wrap))
             {
-                Console.Write($"Retry, because '{wrap.Reason}' ");
-                return InvokePipelineAsyncInternal(wrap.Original, token);
+                return InvokePipelineAsyncInternal(domainEvent, token, 0);
             }
-            else
+            
+            if (wrap.RetryCount < _retryLimit)
             {
-                return InvokePipelineAsyncInternal(domainEvent, token);
+                Console.Write($"Retry {wrap.RetryCount + 1}, because '{wrap.Reason}' ");
+                return InvokePipelineAsyncInternal(wrap.Original, token, wrap.RetryCount + 1);
             }
+
+            _eventBus.PlaceError(wrap.Original, wrap.Reason);
+            return Task.CompletedTask;
         }
 
-        private Task InvokePipelineAsyncInternal(IDomainEvent domainEvent, CancellationToken token)
+        private Task InvokePipelineAsyncInternal(IDomainEvent domainEvent, CancellationToken token, int actualRetryCount)
         {
             if (_pipelines.ContainsKey(domainEvent.GetType()))
             {
@@ -155,13 +166,13 @@ namespace EventBusImpl
 
                 // retry
                 copy = (IDomainEvent)domainEvent.DeepCopyBySerialization();
-                void Action(Task prev, object state)
+                void Retry(Task prev, object state)
                 {
                     var (eventBus, @event) = ((IEventBus eventBus, IDomainEvent domainEvent))state;
-                    eventBus.PlaceEvent(new RetryWrap(@event, prev.Exception.FlatMessage()));
+                    eventBus.PlaceEvent(new RetryWrap(@event, prev.Exception.FlatMessage(), actualRetryCount));
                 }
                 
-                return task.ContinueWith(Action,
+                return task.ContinueWith(Retry,
                                          (_eventBus, copy),
                                          token,
                                          TaskContinuationOptions.OnlyOnFaulted,
@@ -173,15 +184,18 @@ namespace EventBusImpl
 
         private class RetryWrap : IDomainEvent
         {
-            internal RetryWrap(IDomainEvent domainEvent, string reason)
+            internal RetryWrap(IDomainEvent domainEvent, string reason, int retryCount)
             {
                 Original = domainEvent;
                 Reason = reason;
+                RetryCount = retryCount;
             }
 
             internal IDomainEvent Original { get; }
 
             internal string Reason { get; }
+
+            internal int RetryCount { get; }
         }
     }
 }

@@ -1,8 +1,6 @@
 ﻿namespace FibonacciDomain.Steps
 {
-    using System;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Threading.Tasks;
     using DomainEvents;
     using EventBusApi;
@@ -25,14 +23,7 @@
                               CurrentNumber = domainEvent.CalculatedEvent.NextNumber
                           };
 
-            try
-            {
-                await _transmitter.RequestAsync<FibonacciRequest, AcknowledgementResponse>(request);
-            }
-            catch (TimeoutException)
-            {
-                return Enumerable.Empty<IDomainEvent>().ToList();
-            }
+            await _transmitter.RequestAsync<FibonacciRequest, AcknowledgementResponse>(request);
             
             return new[]
                    {

@@ -42,39 +42,32 @@
             where TRequest : class, IRequest<TResponse>
             where TResponse : class, IResponse
         {
-            var timer = StartTimeoutTimer(out var token);
-
+            var timeout = Task.Delay(_millisecondsTimeout);
+            var cts = new CancellationTokenSource();
+            var work = RequestAsyncInternal<TRequest, TResponse>(request, cts.Token);
+            var tasks = new List<Task> { timeout, work };
+            
             try
             {
-                return await RequestAsyncInternal<TRequest, TResponse>(request, token);
-            }
-            catch (OperationCanceledException)
-            {
+                var first = await Task.WhenAny(tasks);
+
+                if (first == work)
+                {
+                    return await (Task<TResponse>) first;
+                }
+                
+                cts.Cancel();
                 throw new TimeoutException();
             }
             catch (HttpRequestException)
             {
                 // do nothing, because it means an external service error
             }
-            finally
-            {
-                timer.Dispose();
-            }
             
             throw new RestBusUnexpectedException();
         }
 
-        private Timer StartTimeoutTimer(out CancellationToken token)
-        {
-            var cts = new CancellationTokenSource();
-            token = cts.Token;
-            return new Timer(state => ((CancellationTokenSource) state).Cancel(),
-                             cts,
-                             _millisecondsTimeout,
-                             -1);
-        }
-
-        public async Task<TResponse> RequestAsyncInternal<TRequest, TResponse>(TRequest request, CancellationToken token)
+        private async Task<TResponse> RequestAsyncInternal<TRequest, TResponse>(TRequest request, CancellationToken token)
             where TRequest : class, IRequest<TResponse>
             where TResponse : class, IResponse
         {

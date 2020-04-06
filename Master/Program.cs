@@ -30,7 +30,8 @@
                                      out var restSecondsTimeout,
                                      out var restMillisecondsPollingDelay,
                                      out var queuePrefix,
-                                     out var concurrencyLevel);
+                                     out var concurrencyLevel,
+                                     out var retryLimit);
 
             /*
              * Composition root - build object graph
@@ -43,7 +44,8 @@
                                                            restSecondsTimeout,
                                                            restMillisecondsPollingDelay,
                                                            queuePrefix,
-                                                           concurrencyLevel);
+                                                           concurrencyLevel,
+                                                           retryLimit);
             
             /*
              * Invoke functionality
@@ -89,7 +91,8 @@
                                                      out int restSecondsTimeout,
                                                      out int restMillisecondsPollingDelay,
                                                      out string queuePrefix,
-                                                     out int concurrencyLevel)
+                                                     out int concurrencyLevel,
+                                                     out int retryLimit)
         {
             asyncCalculationsCount = ExtractConsoleArgument(args);
             
@@ -100,20 +103,22 @@
                                          Username = "guest",
                                          Password = "guest",
                                          Product = nameof(Master),
-                                         SecondsTimeout = 10,
+                                         SecondsTimeout = 3,
                                      };
 
             storageDefault = 0;
 
             slaveApiBaseUri = new Uri("http://localhost:53855/api/fibonacci");
             
-            restSecondsTimeout = 10;
+            restSecondsTimeout = 3;
             
-            restMillisecondsPollingDelay = 500;
+            restMillisecondsPollingDelay = 300;
             
             queuePrefix = nameof(Master);
 
             concurrencyLevel = 10;
+
+            retryLimit = 5;
         }
 
         private static int ExtractConsoleArgument(string[] args)
@@ -135,9 +140,10 @@
                                                                  int restSecondsTimeout,
                                                                  int restMillisecondsPollingDelay,
                                                                  string queuePrefix,
-                                                                 int concurrencyLevel)
+                                                                 int concurrencyLevel,
+                                                                 int retryLimit)
         {
-            var eventPipeline = new EventPipeline(eventBus, concurrencyLevel);
+            var eventPipeline = new EventPipeline(eventBus, concurrencyLevel, retryLimit);
 
             var busTransmitter = new RestBusTransmitter(slaveApiBaseUri,
                                                         restSecondsTimeout * 1000,

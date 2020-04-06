@@ -36,7 +36,8 @@
             GetExternalConfiguration(out var rabbitConnectionConfig,
                                      out var storageDefault,
                                      out var queuePrefix,
-                                     out var concurrencyLevel);
+                                     out var concurrencyLevel,
+                                     out var retryLimit);
             
             /*
              * Composition root - build object graph
@@ -47,7 +48,8 @@
                                                 rabbitConnectionConfig,
                                                 storageDefault,
                                                 queuePrefix,
-                                                concurrencyLevel);
+                                                concurrencyLevel,
+                                                retryLimit);
         }
 
         public void Dispose()
@@ -110,7 +112,8 @@
         private void GetExternalConfiguration(out RabbitConnectionConfig rabbitConnectionConfig,
                                               out long storageDefault,
                                               out string queuePrefix,
-                                              out int concurrencyLevel)
+                                              out int concurrencyLevel,
+                                              out int retryLimit)
         {
             rabbitConnectionConfig = new RabbitConnectionConfig
                                      {
@@ -119,7 +122,7 @@
                                          Username = "guest",
                                          Password = "guest",
                                          Product = nameof(Slave),
-                                         SecondsTimeout = 10,
+                                         SecondsTimeout = 3,
                                      };
 
             storageDefault = 1;
@@ -127,15 +130,18 @@
             queuePrefix = nameof(Slave);
 
             concurrencyLevel = 10;
+
+            retryLimit = 5;
         }
         
         private IProducerEventPipeline ComposeObjectGraph(IEventBus eventBus,
                                                           RabbitConnectionConfig rabbitConnectionConfig,
                                                           long storageDefault,
                                                           string queuePrefix,
-                                                          int concurrencyLevel)
+                                                          int concurrencyLevel,
+                                                          int retryLimit)
         {
-            var eventPipeline = new EventPipeline(eventBus, concurrencyLevel);
+            var eventPipeline = new EventPipeline(eventBus, concurrencyLevel, retryLimit);
             
             var conventions = new RabbitBusConventionsDecorator(new Conventions(new DefaultTypeNameSerializer()), queuePrefix);
             var busTransmitter = new RabbitBusTransmitter(rabbitConnectionConfig, conventions);
