@@ -35,7 +35,8 @@
              */
             GetExternalConfiguration(out var rabbitConnectionConfig,
                                      out var storageDefault,
-                                     out var queuePrefix);
+                                     out var queuePrefix,
+                                     out var concurrencyLevel);
             
             /*
              * Composition root - build object graph
@@ -45,7 +46,8 @@
             _eventPipeline = ComposeObjectGraph(_eventBus,
                                                 rabbitConnectionConfig,
                                                 storageDefault,
-                                                queuePrefix);
+                                                queuePrefix,
+                                                concurrencyLevel);
         }
 
         public void Dispose()
@@ -107,7 +109,8 @@
         
         private void GetExternalConfiguration(out RabbitConnectionConfig rabbitConnectionConfig,
                                               out long storageDefault,
-                                              out string queuePrefix)
+                                              out string queuePrefix,
+                                              out int concurrencyLevel)
         {
             rabbitConnectionConfig = new RabbitConnectionConfig
                                      {
@@ -122,14 +125,17 @@
             storageDefault = 1;
 
             queuePrefix = nameof(Slave);
+
+            concurrencyLevel = 10;
         }
         
         private IProducerEventPipeline ComposeObjectGraph(IEventBus eventBus,
                                                           RabbitConnectionConfig rabbitConnectionConfig,
                                                           long storageDefault,
-                                                          string queuePrefix)
+                                                          string queuePrefix,
+                                                          int concurrencyLevel)
         {
-            var eventPipeline = new EventPipeline(eventBus);
+            var eventPipeline = new EventPipeline(eventBus, concurrencyLevel);
             
             var conventions = new RabbitBusConventionsDecorator(new Conventions(new DefaultTypeNameSerializer()), queuePrefix);
             var busTransmitter = new RabbitBusTransmitter(rabbitConnectionConfig, conventions);

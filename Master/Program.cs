@@ -27,7 +27,10 @@
                                      out var rabbitConnectionConfig,
                                      out var storageDefault,
                                      out var slaveApiUri,
-                                     out var queuePrefix);
+                                     out var restSecondsTimeout,
+                                     out var restMillisecondsPollingDelay,
+                                     out var queuePrefix,
+                                     out var concurrencyLevel);
 
             /*
              * Composition root - build object graph
@@ -37,7 +40,10 @@
                                                            rabbitConnectionConfig,
                                                            storageDefault,
                                                            slaveApiUri,
-                                                           queuePrefix);
+                                                           restSecondsTimeout,
+                                                           restMillisecondsPollingDelay,
+                                                           queuePrefix,
+                                                           concurrencyLevel);
             
             /*
              * Invoke functionality
@@ -67,7 +73,7 @@
             }
         }
 
-        private static void RunCalculations(IEventBus eventBus, uint asyncCalculationsCount, long storageDefault)
+        private static void RunCalculations(IEventBus eventBus, int asyncCalculationsCount, long storageDefault)
         {
             for (var i = 0; i < asyncCalculationsCount; ++i)
             {
@@ -76,11 +82,14 @@
         }
 
         private static void GetExternalConfiguration(string[] args,
-                                                     out uint asyncCalculationsCount,
+                                                     out int asyncCalculationsCount,
                                                      out RabbitConnectionConfig rabbitConnectionConfig,
                                                      out long storageDefault,
                                                      out Uri slaveApiBaseUri,
-                                                     out string queuePrefix)
+                                                     out int restSecondsTimeout,
+                                                     out int restMillisecondsPollingDelay,
+                                                     out string queuePrefix,
+                                                     out int concurrencyLevel)
         {
             asyncCalculationsCount = ExtractConsoleArgument(args);
             
@@ -97,15 +106,21 @@
             storageDefault = 0;
 
             slaveApiBaseUri = new Uri("http://localhost:53855/api/fibonacci");
-
+            
+            restSecondsTimeout = 10;
+            
+            restMillisecondsPollingDelay = 500;
+            
             queuePrefix = nameof(Master);
+
+            concurrencyLevel = 10;
         }
 
-        private static uint ExtractConsoleArgument(string[] args)
+        private static int ExtractConsoleArgument(string[] args)
         {
             try
             {
-                return Convert.ToUInt32(string.Join(string.Empty, args));
+                return Convert.ToInt32(string.Join(string.Empty, args));
             }
             catch (Exception)
             {
@@ -117,13 +132,16 @@
                                                                  RabbitConnectionConfig rabbitConnectionConfig,
                                                                  long storageDefault,
                                                                  Uri slaveApiBaseUri,
-                                                                 string queuePrefix)
+                                                                 int restSecondsTimeout,
+                                                                 int restMillisecondsPollingDelay,
+                                                                 string queuePrefix,
+                                                                 int concurrencyLevel)
         {
-            var eventPipeline = new EventPipeline(eventBus);
+            var eventPipeline = new EventPipeline(eventBus, concurrencyLevel);
 
             var busTransmitter = new RestBusTransmitter(slaveApiBaseUri,
-                                                        rabbitConnectionConfig.SecondsTimeout * 1000,
-                                                        500,
+                                                        restSecondsTimeout * 1000,
+                                                        restMillisecondsPollingDelay,
                                                         new List<IRestBusTransmitterFactory>
                                                         {
                                                             new FibonacciRestBusTransmitterFactory() // strategies
