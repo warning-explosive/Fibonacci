@@ -1,6 +1,7 @@
 ﻿namespace FibonacciDomain.Steps
 {
     using System.Collections.Generic;
+    using System.Threading.Tasks;
     using Calculation;
     using DomainEvents;
     using EventBusApi;
@@ -18,14 +19,13 @@
             _storage = storage;
         }
         
-        public IReadOnlyCollection<IDomainEvent> HandleEvent(RequestReceivedEvent<FibonacciRequest> domainEvent)
+        public Task<IReadOnlyCollection<IDomainEvent>> HandleEvent(RequestReceivedEvent<FibonacciRequest> domainEvent)
         {
             var nextNumber = _calculator.CalculateNextNumber(domainEvent.Request.CurrentNumber, _storage.GetPreviousNumber(domainEvent.Request.CalculationId));
 
-            return new[]
-                   {
-                       new CalculatedEvent(domainEvent.Request.CalculationId, nextNumber)
-                   };
+            IReadOnlyCollection<IDomainEvent> events = new List<IDomainEvent> { new CalculatedEvent(domainEvent.Request.CalculationId, nextNumber) };
+
+            return Task.FromResult(events);
         }
     }
 }

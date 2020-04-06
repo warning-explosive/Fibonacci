@@ -1,10 +1,11 @@
 ﻿namespace EventBusApi
 {
     using System.Collections.Generic;
+    using System.Threading.Tasks;
 
     public interface IPipelineStep<TDomainEvent>
         where TDomainEvent : IDomainEvent
     {
-        IReadOnlyCollection<IDomainEvent> HandleEvent(TDomainEvent domainEvent);
+        Task<IReadOnlyCollection<IDomainEvent>> HandleEvent(TDomainEvent domainEvent);
     }
 }

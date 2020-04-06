@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading.Tasks;
     using DomainEvents;
     using EventBusApi;
 
@@ -15,18 +16,21 @@
             _decoratee = decoratee;
         }
         
-        public IReadOnlyCollection<IDomainEvent> HandleEvent(RequestReceivedEvent<FibonacciRequest> domainEvent)
+        public Task<IReadOnlyCollection<IDomainEvent>> HandleEvent(RequestReceivedEvent<FibonacciRequest> domainEvent)
         {
             Console.WriteLine($"Calculation: {domainEvent.Request.CalculationId} | {domainEvent.Request.CurrentNumber}");
             
-            var events = _decoratee.HandleEvent(domainEvent);
-
-            foreach (var calculated in events.OfType<CalculatedEvent>())
-            {
-                Console.WriteLine($"Calculated: {calculated.CalculationId} | {calculated.NextNumber}");
-            }
-
-            return events;
+            return _decoratee.HandleEvent(domainEvent)
+                             .ContinueWith(prev =>
+                                           {
+                                               foreach (var calculated in prev.Result.OfType<CalculatedEvent>())
+                                               {
+                                                   Console.WriteLine($"Calculated: {calculated.CalculationId} | {calculated.NextNumber}");
+                                               }
+                                    
+                                               return prev.Result;
+                                           },
+                                           TaskContinuationOptions.NotOnCanceled | TaskContinuationOptions.NotOnFaulted);
         }
     }
 }

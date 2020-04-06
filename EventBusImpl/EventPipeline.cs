@@ -47,7 +47,7 @@ namespace EventBusImpl
 
             void ExecuteHandler(IDomainEvent domainEvent)
             {
-                foreach (var @event in step.HandleEvent((TDomainEvent) domainEvent))
+                foreach (var @event in step.HandleEvent((TDomainEvent) domainEvent).Result) // TODO: block
                 {
                     _eventBus.PlaceEvent(@event);
                 }

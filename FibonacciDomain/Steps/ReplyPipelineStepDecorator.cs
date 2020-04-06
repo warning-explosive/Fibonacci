@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading.Tasks;
     using DomainEvents;
     using EventBusApi;
 
@@ -15,18 +16,23 @@
             _decoratee = decoratee;
         }
 
-        public IReadOnlyCollection<IDomainEvent> HandleEvent(CalculationStoredEvent domainEvent)
+        public Task<IReadOnlyCollection<IDomainEvent>> HandleEvent(CalculationStoredEvent domainEvent)
         {
             Console.WriteLine($"Attempt to send: {domainEvent.CalculatedEvent.CalculationId} | {domainEvent.CalculatedEvent.NextNumber}");
             
-            var events = _decoratee.HandleEvent(domainEvent);
-            
-            foreach (var sent in events.OfType<ReplySentEvent>())
-            {
-                Console.WriteLine($"Sent: {sent.Request.CalculationId} | {sent.Request.CurrentNumber}");
-            }
+            return _decoratee.HandleEvent(domainEvent)
+                             .ContinueWith(prev =>
+                                           {
+                                               foreach (var sent in prev.Result.OfType<ReplySentEvent>())
+                                               {
+                                                   Console.WriteLine($"Sent: {sent.Request.CalculationId} | {sent.Request.CurrentNumber}");
+                                               }
 
-            return events;
+                                               return prev.Result;
+                                           },
+                                           TaskContinuationOptions.NotOnCanceled | TaskContinuationOptions.NotOnFaulted);
+            
+            
         }
     }
 }
