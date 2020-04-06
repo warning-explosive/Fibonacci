@@ -4,6 +4,7 @@
     using EventBusApi;
 
     [Serializable]
+    [Priority(3)]
     public class ReplySentEvent : IDomainEvent
     {
         public ReplySentEvent(FibonacciRequest request)

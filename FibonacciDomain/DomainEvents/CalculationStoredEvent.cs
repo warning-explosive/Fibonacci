@@ -4,6 +4,7 @@
     using EventBusApi;
 
     [Serializable]
+    [Priority(1)]
     public class CalculationStoredEvent : IDomainEvent
     {
         public CalculationStoredEvent(CalculatedEvent calculatedEvent)

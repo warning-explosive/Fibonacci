@@ -5,6 +5,7 @@
     using EasyNetQ;
     using EventBusApi;
     using EventBusImpl;
+    using FibonacciDomain;
     using FibonacciDomain.DomainEvents;
     using FibonacciDomain.Steps;
     using RabbitBasics;
@@ -36,7 +37,7 @@
             /*
              * Composition root - build object graph
              */
-            var eventBus = new EventBus();
+            var eventBus = new HybridEventBus(new DummyEventBusWithPriority(), new EventBus());
             var producerEventPipeline = ComposeObjectGraph(eventBus,
                                                            rabbitConnectionConfig,
                                                            storageDefault,

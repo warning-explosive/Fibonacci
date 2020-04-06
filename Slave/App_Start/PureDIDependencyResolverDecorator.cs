@@ -8,6 +8,7 @@
     using EasyNetQ;
     using EventBusApi;
     using EventBusImpl;
+    using FibonacciDomain;
     using FibonacciDomain.Steps;
     using RabbitBasics;
     using EventBus = EventBusImpl.EventBus;
@@ -43,7 +44,7 @@
              * Composition root - build object graph
              */
             _activator = new HttpControllerActivatorDecorator(new DefaultHttpControllerActivator(), this);
-            _eventBus = new EventBus();
+            _eventBus = new HybridEventBus(new DummyEventBusWithPriority(), new EventBus());
             _eventPipeline = ComposeObjectGraph(_eventBus,
                                                 rabbitConnectionConfig,
                                                 storageDefault,

@@ -4,6 +4,7 @@
     using EventBusApi;
 
     [Serializable]
+    [Priority(0)]
     public class RequestReceivedEvent<TRequest> : IDomainEvent
     {
         public RequestReceivedEvent(TRequest request)

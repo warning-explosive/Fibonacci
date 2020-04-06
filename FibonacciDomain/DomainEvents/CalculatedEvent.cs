@@ -4,6 +4,7 @@
     using EventBusApi;
 
     [Serializable]
+    [Priority(2)]
     public class CalculatedEvent : IDomainEvent
     {
         public CalculatedEvent(Guid calculationId, long nextNumber)
