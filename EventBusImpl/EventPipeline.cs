@@ -13,7 +13,7 @@ namespace EventBusImpl
     {
         private bool _isLocked;
         
-        private readonly IDictionary<Type, Queue<Action<IDomainEvent>>> _pipelines;
+        private readonly IDictionary<Type, Queue<Func<IDomainEvent, Task>>> _pipelines;
         
         private readonly IEventBus _eventBus;
 
@@ -30,7 +30,7 @@ namespace EventBusImpl
         public EventPipeline(IEventBus eventBus, int concurrencyLevel, int retryLimit)
         {
             _isLocked = false;
-            _pipelines = new Dictionary<Type, Queue<Action<IDomainEvent>>>();
+            _pipelines = new Dictionary<Type, Queue<Func<IDomainEvent, Task>>>();
             _eventBus = eventBus;
             _concurrencyLevel = concurrencyLevel;
             _concurrencyList = new List<Task>(_concurrencyLevel);
@@ -50,14 +50,14 @@ namespace EventBusImpl
             if (!_pipelines.ContainsKey(typeof(TDomainEvent))
                 || _pipelines[typeof(TDomainEvent)] == null)
             {
-                _pipelines[typeof(TDomainEvent)] = new Queue<Action<IDomainEvent>>();
+                _pipelines[typeof(TDomainEvent)] = new Queue<Func<IDomainEvent, Task>>();
             }
 
             _pipelines[typeof(TDomainEvent)].Enqueue(ExecuteHandler);
 
-            void ExecuteHandler(IDomainEvent domainEvent)
+            async Task ExecuteHandler(IDomainEvent domainEvent)
             {
-                foreach (var @event in step.HandleEvent((TDomainEvent) domainEvent).Result) // TODO: block
+                foreach (var @event in await step.HandleEvent((TDomainEvent) domainEvent))
                 {
                     _eventBus.PlaceEvent(@event);
                 }
@@ -149,46 +149,33 @@ namespace EventBusImpl
             return Task.CompletedTask;
         }
 
-        private Task InvokePipelineAsyncInternal(IDomainEvent domainEvent, CancellationToken token, int actualRetryCount)
+        private async Task InvokePipelineAsyncInternal(IDomainEvent domainEvent, CancellationToken token, int actualRetryCount)
         {
             if (_pipelines.ContainsKey(domainEvent.GetType()))
             {
                 // pipeline - step 0
-                var action = _pipelines[domainEvent.GetType()].First();
+                var firstEventHandler = _pipelines[domainEvent.GetType()].First();
                 var copy = (IDomainEvent)domainEvent.DeepCopyBySerialization();
-                var task = Task.Factory.StartNew(obj => action((IDomainEvent) obj),
-                                                 copy,
-                                                 token,
-                                                 TaskCreationOptions.DenyChildAttach,
-                                                 TaskScheduler.Default);
-                
-                // pipeline - other steps
-                foreach (var eventHandler in _pipelines[domainEvent.GetType()].Skip(1))
-                {
-                    copy = (IDomainEvent)domainEvent.DeepCopyBySerialization();
-                    task = task.ContinueWith((_, obj) => eventHandler.Invoke((IDomainEvent) obj),
-                                             copy,
-                                             token,
-                                             TaskContinuationOptions.NotOnFaulted | TaskContinuationOptions.NotOnCanceled,
-                                             TaskScheduler.Default);
-                }
 
-                // retry
-                copy = (IDomainEvent)domainEvent.DeepCopyBySerialization();
-                void Retry(Task prev, object state)
+                try
                 {
-                    var (eventBus, @event) = ((IEventBus eventBus, IDomainEvent domainEvent))state;
-                    eventBus.PlaceEvent(new RetryWrap(@event, prev.Exception.FlatMessage(), actualRetryCount));
+                    await firstEventHandler.Invoke(copy);
+
+                    // pipeline - other steps
+                    foreach (var nextEventHandler in _pipelines[domainEvent.GetType()].Skip(1))
+                    {
+                        copy = (IDomainEvent) domainEvent.DeepCopyBySerialization();
+                        await nextEventHandler.Invoke(copy);
+                    }
                 }
-                
-                return task.ContinueWith(Retry,
-                                         (_eventBus, copy),
-                                         token,
-                                         TaskContinuationOptions.OnlyOnFaulted,
-                                         TaskScheduler.Default);
+                catch (Exception ex)
+                {
+                    // retry
+                    copy = (IDomainEvent) domainEvent.DeepCopyBySerialization();
+                    var retry = new RetryWrap(copy, ex.FlatMessage(), actualRetryCount);
+                    _eventBus.PlaceEvent(retry);
+                }
             }
-
-            return Task.CompletedTask;
         }
 
         private class RetryWrap : IDomainEvent

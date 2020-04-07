@@ -36,7 +36,7 @@
             /*
              * Composition root - build object graph
              */
-            var eventBus = new HybridEventBus(new DummyEventBusWithPriority(), new EventBus());
+            var eventBus = new EventBus();
             var producerEventPipeline = ComposeObjectGraph(eventBus,
                                                            rabbitConnectionConfig,
                                                            storageDefault,

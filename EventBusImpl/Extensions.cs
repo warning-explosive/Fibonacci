@@ -21,9 +21,13 @@
             }
         }
 
-        internal static string FlatMessage(this AggregateException exception)
+        internal static string FlatMessage(this Exception exception)
         {
-            return string.Join(", ", exception.InnerExceptions.SelectMany(Unwrap).Select(ex => ex.Message));
+            var flat = exception is AggregateException aggregateException
+                           ? aggregateException.InnerExceptions.SelectMany(Unwrap)
+                           : exception.Unwrap();
+            
+            return string.Join(", ", flat.Select(ex => ex.Message));
         }
 
         private static IEnumerable<Exception> Unwrap(this Exception exception)
@@ -38,6 +42,8 @@
             {
                 return targetInvocation.InnerException.Unwrap();
             }
+
+            exception.InnerException?.Unwrap();
 
             return new List<Exception> { exception };
         }

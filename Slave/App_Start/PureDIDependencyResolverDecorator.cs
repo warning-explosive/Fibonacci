@@ -46,7 +46,7 @@
              * Composition root - build object graph
              */
             _activator = new HttpControllerActivatorDecorator(new DefaultHttpControllerActivator(), this);
-            _eventBus = new HybridEventBus(new DummyEventBusWithPriority(), new EventBus());
+            _eventBus = new EventBus();
             _eventPipeline = ComposeObjectGraph(_eventBus,
                                                 rabbitConnectionConfig,
                                                 storageDefault,
