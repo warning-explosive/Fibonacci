@@ -63,15 +63,15 @@
             {
                 /*
                  * Release graph
-                 *     - TODO: stop workers
-                 *     - TODO: remove RabbitMQ queues
+                 *     - stop workers
+                 *     - remove RabbitMQ queues (RabbitBusReceiver have durable queue)
                  *     - clean up disposables
                  */
                 producerEventPipeline.StopAndRelease();
                 
                 foreach (var disposable in Disposables)
                 {
-                    disposable?.Dispose();
+                    disposable.Dispose();
                 }
             }
         }

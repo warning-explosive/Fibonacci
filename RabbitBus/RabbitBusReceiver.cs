@@ -4,6 +4,7 @@
     using System.Collections.Generic;
     using System.Threading.Tasks;
     using EasyNetQ;
+    using EasyNetQ.Topology;
     using TransportApi;
 
     public class RabbitBusReceiver : IBusReceiver
@@ -12,7 +13,7 @@
         
         private readonly IBus _bus;
         
-        private readonly ICollection<IDisposable> _disposables = new List<IDisposable>(); 
+        private readonly ICollection<Action> _disposables = new List<Action>(); 
         
         public RabbitBusReceiver(RabbitConnectionConfig connectionConfig, IConventions conventions)
         {
@@ -24,18 +25,27 @@
             where TRequest : class, IRequest<TResponse>
             where TResponse : class, IResponse
         {
-            var disposable = _bus.RespondAsync<TRequest, TResponse>(request => Task.Factory.StartNew(() => handler.HandleRequest(request), TaskCreationOptions.DenyChildAttach));
-            _disposables.Add(disposable);
+            _bus.RespondAsync<TRequest, TResponse>(request => Task.Factory.StartNew(() => handler.HandleRequest(request), TaskCreationOptions.DenyChildAttach));
+            
+            // get reference to respond queue
+            var queue = _bus.Advanced.QueueDeclare(_conventions.RpcRoutingKeyNamingConvention.Invoke(typeof(TRequest)));
+            _disposables.Add(() => DisposeRespondQueue(queue));
         }
 
         public void Dispose()
         {
             foreach (var disposable in _disposables)
             {
-                disposable?.Dispose();
+                disposable.Invoke();
             }
             
-            _bus?.Dispose();
+            _bus.Dispose();
+        }
+        
+        private void DisposeRespondQueue(IQueue queue)
+        {
+            _bus.Advanced.QueuePurge(queue);
+            _bus.Advanced.QueueDelete(queue);
         }
     }
 }

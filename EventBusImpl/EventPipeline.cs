@@ -12,8 +12,6 @@ namespace EventBusImpl
                                  IProducerEventPipeline
     {
         private bool _isLocked;
-
-        private bool _isRunning;
         
         private readonly IDictionary<Type, Queue<Action<IDomainEvent>>> _pipelines;
         
@@ -23,20 +21,22 @@ namespace EventBusImpl
 
         private readonly List<Task> _concurrencyList;
 
+        private readonly int _retryLimit;
+
         private readonly CancellationTokenSource _cts;
 
-        private readonly int _retryLimit;
+        private static ManualResetEvent _mre;
 
         public EventPipeline(IEventBus eventBus, int concurrencyLevel, int retryLimit)
         {
             _isLocked = false;
-            _isRunning = false;
             _pipelines = new Dictionary<Type, Queue<Action<IDomainEvent>>>();
             _eventBus = eventBus;
             _concurrencyLevel = concurrencyLevel;
             _concurrencyList = new List<Task>(_concurrencyLevel);
-            _cts = new CancellationTokenSource();
             _retryLimit = retryLimit;
+            _cts = new CancellationTokenSource();
+            _mre = new ManualResetEvent(false);
         }
 
         public void RegisterStep<TDomainEvent>(IPipelineStep<TDomainEvent> step)
@@ -66,11 +66,17 @@ namespace EventBusImpl
 
         public void StopAndRelease()
         {
-            _isRunning = false;
+            while (!_mre.Reset())
+            {
+                Thread.Sleep(100);
+            }
+
             _cts.Cancel();
+            
             try
             {
                 Task.WhenAll(_concurrencyList).Wait(); // TODO: block
+                _concurrencyList.Clear();
             }
             catch (AggregateException ex)
             {
@@ -95,13 +101,13 @@ namespace EventBusImpl
 
         private void RunEventLoop()
         {
-            _isRunning = true;
+            _mre.Set();
             Task.Factory.StartNew(RunEventLoopInternal, TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning);
         }
 
         private void RunEventLoopInternal()
         {
-            while (_isRunning)
+            while (_mre.WaitOne())
             {
                 // throttling
                 while (_concurrencyList.Count < _concurrencyLevel

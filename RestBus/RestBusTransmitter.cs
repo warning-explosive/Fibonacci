@@ -15,6 +15,8 @@
         
         private readonly Uri _uri;
 
+        private object _aliveAt;
+        
         private readonly int _millisecondsTimeout;
         
         private readonly int _millisecondsPollingDelay;
@@ -28,6 +30,7 @@
         {
             _uri = uri;
             _client = new HttpClient();
+            _aliveAt = DateTime.MinValue;
             _millisecondsTimeout = millisecondsTimeout;
             _millisecondsPollingDelay = millisecondsPollingDelay;
             _factories = factories.Reverse().ToList(); // reverse for overrides
@@ -35,7 +38,7 @@
 
         public void Dispose()
         {
-            _client?.Dispose();
+            _client.Dispose();
         }
 
         public async Task<TResponse> RequestAsync<TRequest, TResponse>(TRequest request)
@@ -71,7 +74,7 @@
             where TRequest : class, IRequest<TResponse>
             where TResponse : class, IResponse
         {
-            while (!await TryGetAlive())
+            while ((DateTime)Volatile.Read(ref _aliveAt) < DateTime.Now && !await TryGetAlive())
             {
                 token.ThrowIfCancellationRequested();
                 await Task.Delay(_millisecondsPollingDelay, token);
@@ -82,6 +85,8 @@
             using (var response = await _client.PostAsync(postUri, new StringContent(string.Empty), token))
             {
                 response.EnsureSuccessStatusCode();
+
+                RefreshAliveStatus();
                 return ConstructResponse<TRequest, TResponse>(request);
             }
         }
@@ -93,7 +98,16 @@
                 using (var response = await _client.GetAsync(_uri))
                 {
                     var responseMessage = response.EnsureSuccessStatusCode();
-                    return responseMessage.StatusCode == HttpStatusCode.OK;
+
+                    if (responseMessage.StatusCode == HttpStatusCode.OK)
+                    {
+                        RefreshAliveStatus();
+                        return true;
+                    }
+                    else
+                    {
+                        return false;
+                    }
                 }
             }
             catch(HttpRequestException)
@@ -132,6 +146,11 @@
             {
                 throw new NotSupportedException(typeof(TRequest).FullName);
             }
+        }
+
+        private void RefreshAliveStatus()
+        {
+            Interlocked.Exchange(ref _aliveAt, DateTime.Now.AddMilliseconds(_millisecondsPollingDelay));
         }
     } 
 }

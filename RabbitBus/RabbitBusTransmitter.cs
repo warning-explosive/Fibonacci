@@ -18,7 +18,7 @@
 
         public void Dispose()
         {
-            _bus?.Dispose();
+            _bus.Dispose();
         }
 
         public Task<TResponse> RequestAsync<TRequest, TResponse>(TRequest request)

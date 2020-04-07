@@ -26,6 +26,8 @@
 
         private readonly ICollection<IDisposable> _disposables = new List<IDisposable>();
 
+        private bool _disposed = false;
+
         public PureDIDependencyResolverDecorator(IDependencyResolver decoratee)
         {
             _decoratee = decoratee;
@@ -51,21 +53,30 @@
                                                 queuePrefix,
                                                 concurrencyLevel,
                                                 retryLimit);
+
+            AppDomain.CurrentDomain.DomainUnload += (sender, args) => Dispose();
         }
 
         public void Dispose()
         {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            
             /*
              * Release graph
-             *     - TODO: stop workers
-             *     - TODO: remove RabbitMQ queues
+             *     - stop workers
+             *     - remove RabbitMQ queues (RabbitBusTransmitter have auto delete queue)
              *     - clean up disposables
              */
             _eventPipeline.StopAndRelease();
             
             foreach (var disposable in _disposables)
             {
-                disposable?.Dispose();
+                disposable.Dispose();
             }
             
             _decoratee.Dispose();
