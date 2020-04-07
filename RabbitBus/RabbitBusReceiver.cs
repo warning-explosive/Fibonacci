@@ -25,7 +25,7 @@
             where TRequest : class, IRequest<TResponse>
             where TResponse : class, IResponse
         {
-            _bus.RespondAsync<TRequest, TResponse>(request => Task.Factory.StartNew(() => handler.HandleRequest(request), TaskCreationOptions.DenyChildAttach));
+            _bus.RespondAsync<TRequest, TResponse>(request => Task.Factory.StartNew(() => handler.HandleRequest(request), TaskCreationOptions.AttachedToParent));
             
             // get reference to respond queue
             var queue = _bus.Advanced.QueueDeclare(_conventions.RpcRoutingKeyNamingConvention.Invoke(typeof(TRequest)));

@@ -66,11 +66,7 @@ namespace EventBusImpl
 
         public void StopAndRelease()
         {
-            while (!_mre.Reset())
-            {
-                Thread.Sleep(100);
-            }
-
+            _mre.Reset();
             _cts.Cancel();
             
             try
@@ -113,13 +109,20 @@ namespace EventBusImpl
                 while (_concurrencyList.Count < _concurrencyLevel
                        && _eventBus.TryDequeue(out var domainEvent))
                 {
-                    _concurrencyList.Add(InvokePipelineAsync(domainEvent, _cts.Token));
+                    if (_mre.WaitOne())
+                    {
+                        _concurrencyList.Add(InvokePipelineAsync(domainEvent, _cts.Token));
+                    }
                 }
                 
                 if (_concurrencyList.Any())
                 {
                     var anyTask = Task.WhenAny(_concurrencyList).Result; // TODO: block
-                    _concurrencyList.Remove(anyTask);
+                    
+                    if (_mre.WaitOne())
+                    {
+                        _concurrencyList.Remove(anyTask);
+                    }
                 }
             }
         }

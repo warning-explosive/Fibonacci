@@ -19,11 +19,16 @@
         public bool TryDequeue(out IDomainEvent domainEvent)
         {
             domainEvent = null;
-
-            return _storage.OrderByDescending(z => z.Key)
-                           .FirstOrDefault(z => z.Value.Any())
-                           .Value
-                          ?.TryDequeue(out domainEvent) ?? false;
+            ConcurrentQueue<IDomainEvent> queue;
+            
+            lock (_storage)
+            {
+                queue = _storage.OrderByDescending(z => z.Key)
+                                .FirstOrDefault(z => z.Value.Any())
+                                .Value;
+            }
+            
+            return queue?.TryDequeue(out domainEvent) ?? false;
         }
     }
 }

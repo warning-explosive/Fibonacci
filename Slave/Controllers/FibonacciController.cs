@@ -38,14 +38,5 @@
             
             return Ok();
         }
-        
-        /*
-         * Example
-         * GET http://localhost:53855/api/FibonacciDomain
-         */
-        public IHttpActionResult GetAlive()
-        {
-            return Ok();
-        }
     }
 }

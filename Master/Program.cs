@@ -29,7 +29,6 @@
                                      out var storageDefault,
                                      out var slaveApiUri,
                                      out var restSecondsTimeout,
-                                     out var restMillisecondsPollingDelay,
                                      out var queuePrefix,
                                      out var concurrencyLevel,
                                      out var retryLimit);
@@ -43,7 +42,6 @@
                                                            storageDefault,
                                                            slaveApiUri,
                                                            restSecondsTimeout,
-                                                           restMillisecondsPollingDelay,
                                                            queuePrefix,
                                                            concurrencyLevel,
                                                            retryLimit);
@@ -90,7 +88,6 @@
                                                      out long storageDefault,
                                                      out Uri slaveApiBaseUri,
                                                      out int restSecondsTimeout,
-                                                     out int restMillisecondsPollingDelay,
                                                      out string queuePrefix,
                                                      out int concurrencyLevel,
                                                      out int retryLimit)
@@ -112,8 +109,6 @@
             slaveApiBaseUri = new Uri("http://localhost:53855/api/fibonacci");
             
             restSecondsTimeout = 3;
-            
-            restMillisecondsPollingDelay = 300;
             
             queuePrefix = nameof(Master);
 
@@ -139,7 +134,6 @@
                                                                  long storageDefault,
                                                                  Uri slaveApiBaseUri,
                                                                  int restSecondsTimeout,
-                                                                 int restMillisecondsPollingDelay,
                                                                  string queuePrefix,
                                                                  int concurrencyLevel,
                                                                  int retryLimit)
@@ -148,7 +142,6 @@
 
             var busTransmitter = new RestBusTransmitter(slaveApiBaseUri,
                                                         restSecondsTimeout * 1000,
-                                                        restMillisecondsPollingDelay,
                                                         new List<IRestBusTransmitterFactory>
                                                         {
                                                             new FibonacciRestBusTransmitterFactory() // strategies
