@@ -73,6 +73,7 @@ namespace EventBusImpl
             {
                 Task.WhenAll(_concurrencyList).Wait(); // TODO: block
                 _concurrencyList.Clear();
+                _cts.Dispose();
             }
             catch (AggregateException ex)
             {
